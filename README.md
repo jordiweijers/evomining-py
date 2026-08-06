@@ -9,7 +9,8 @@ vendored/adapted from corason-py, and every artifact is keyed on a composite
 `<genome_stem>__<locus_tag>` ID. GATOR-GC, CORASON and antiSMASH stay in their
 own environments — they are separate steps in the workflow rather than part of
 EvoMining proper.
-
+## Status
+Under active development and testing
 ## Installation
 
 Clone the repository and build the environment from `environment.yml`. This
