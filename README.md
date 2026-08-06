@@ -8,6 +8,8 @@
 Enzyme family expansion analysis for biosynthetic gene cluster discovery — a
 Python reimplementation of EvoMining (Selem-Mojica et al. 2019), packaged as a
 single conda environment and a single `evomining` command.
+See the original tool: https://github.com/nselem/evomining
+And the paper https://www.microbiologyresearch.org/content/journal/mgen/10.1099/mgen.0.000260
 
 Genomes are read directly from GenBank (`.gbff`/`.gbk`); the parser is
 vendored/adapted from corason-py, and every artifact is keyed on a composite
