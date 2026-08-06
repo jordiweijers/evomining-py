@@ -7,7 +7,7 @@ name = "evomining"
 version = "1.0.0"
 description = "Enzyme family expansion analysis for biosynthetic gene cluster discovery"
 requires-python = ">=3.9"
-dependencies = ["numpy"]
+dependencies = ["numpy", "biopython"]
 
 [project.scripts]
 evomining = "evomining.cli:main"
