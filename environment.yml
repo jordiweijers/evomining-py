@@ -1,0 +1,26 @@
+# Single environment for the whole EvoMining pipeline.
+#
+#   micromamba env create -f environment.yml
+#   micromamba activate evomining
+#   pip install .            
+#
+#   This is a refactor of the original Perl EvoMining to Python
+
+name: evomining
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - biopython
+  # --- alignment / phylogeny ---
+  - blast=2.17
+  - muscle=5.3
+  - mafft=7.526
+  - trimal=1.5.1
+  - fasttree=2.2.0
+  - newick_utils=1.6
+  - pip:
+      - .
