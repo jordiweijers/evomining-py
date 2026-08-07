@@ -38,9 +38,16 @@ def is_genbank(path: Path) -> bool:
     return path.suffix.lower() in GENBANK_SUFFIXES
 
 
-def load_genbank(path: Path, name: str | None = None, keep_pseudo: bool = False) -> Genome:
-    """Load every record of a GenBank file into one :class:`Genome`."""
-    genome = Genome(id=path.stem, name=name or "", source_path=path)
+def load_genbank(path: Path, name: str | None = None, keep_pseudo: bool = False,
+                 stem: str | None = None) -> Genome:
+    """Load every record of a GenBank file into one :class:`Genome`.
+
+    ``stem`` overrides the genome id (which defaults to the filename stem). It is
+    set when genomes are laid out one-per-folder, so the id becomes the folder
+    name rather than a possibly-generic inner filename.
+    """
+    gid = stem or path.stem
+    genome = Genome(id=gid, name=name or "", source_path=path)
 
     by_contig: dict[str, list[Gene]] = {}
     contig_lengths: dict[str, int | None] = {}
@@ -49,7 +56,7 @@ def load_genbank(path: Path, name: str | None = None, keep_pseudo: bool = False)
     for record in SeqIO.parse(path, "genbank"):
         contig_id = record.id or record.name
         if not contig_id or contig_id == "<unknown id>":
-            contig_id = f"{path.stem}_{len(by_contig) + 1}"
+            contig_id = f"{gid}_{len(by_contig) + 1}"
 
         if record.id and record.id not in genome.accessions:
             genome.accessions.append(record.id)

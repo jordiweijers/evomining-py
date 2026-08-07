@@ -70,10 +70,14 @@ the rest of the pipeline consumes: `GENOMES.fasta` (one record per CDS, header =
 evomining generate-genome-db -i <genomes_dir> --list-dir <lists_dir>
 ```
 
-- **`-i, --input-dir`** — directory with one subdirectory per genome. The
-  subdirectory name is the genome name and must match the names in your list
-  files exactly (case-sensitive). Each subdirectory holds exactly one
-  `.gbff`/`.gbk` and one primary `.faa` (see *Genome input layout* below).
+- **`-i, --input-dir`** — genome input. Accepts either a flat directory of
+  GenBank files (`.gbff`/`.gbk`), or a directory of one-subdirectory-per-genome
+  holding each genome's annotation, or a mix of the two (see *Genome input
+  layout* below). Proteins are read directly from the GenBank `/translation`
+  features — no `.faa` is required. In the flat layout the genome stem is the
+  filename; in the per-genome-folder layout it is the folder name, which must
+  match the names in your list files (case-sensitive) and your antiSMASH
+  directory names.
 - **`-l, --lists`** — one or more `.txt` files, each listing genome stems to
   include (one per line), space-separated on the flag:
   `--lists cladeA.txt cladeB.txt`. Only genomes named in these lists are built.
@@ -226,36 +230,42 @@ evomining trees --mibig MiBIG_DB.faa
 
 ### Genome input layout
 
-`generate-genome-db` expects one subdirectory per genome under `--input-dir`.
-The subdirectory name is the genome name and must match the name in your list
-files exactly (case-sensitive):
+`generate-genome-db` reads proteins straight from each genome's GenBank file
+(the CDS `/translation` qualifiers); it does **not** read `.faa`. It accepts two
+layouts under `--input-dir`, and a mix of the two.
+
+**Flat** — GenBank files directly in the directory; the genome stem is the
+filename:
+
+```
+input/
+  Nostoc_sp_PCC_7107.gbff
+  Anabaena_sp_PCC_7120.gbff
+```
+
+**One folder per genome** — the folder name is the genome stem, and the
+annotation file inside may be named anything (handy for PGAP's generic
+`annot.gbk`, or when the folder is the only meaningful genome label):
 
 ```
 input/
   Nostoc_sp_PCC_7107/
-    <anything>.gbff   (or .gbk)      required — exactly one
-    <anything>.faa                   required — the primary protein FASTA
-    <anything>.ffn                   optional — nucleotide source
+    <anything>.gbff   (or .gbk)      required — exactly one GenBank file
+    <anything>.faa                   ignored (proteins come from the GenBank)
+    <anything>.ffn                   ignored
 ```
 
-Filenames are not inspected, so this works with Bakta, Prokka, PGAP, or any
-annotator producing a GenBank file and a protein FASTA — one genome per
-directory. The `.faa` and `.gbff` are joined by `locus_tag` (the first token of
-each `.faa` header must equal a `/locus_tag` in the GenBank CDS features), which
-Bakta, Prokka and PGAP's `annot.faa` all satisfy.
+Filenames are not inspected, so this works with Bakta (`.gbff`), Prokka
+(`.gbk`), PGAP (`annot.gbk`), NCBI `datasets` (`genomic.gbff`), or any annotator
+that emits GenBank — one genome per directory. Each genome folder must contain
+exactly one GenBank file; if it holds more than one the tool prefers `.gbff`,
+then `.gbk`/`.gb`/`.genbank`, and stops with an error naming the files rather
+than guessing.
 
-When an annotator writes more than one protein FASTA, the tool keeps the primary
-one and ignores known secondaries by name (markers `hypotheticals`, `_proteins`,
-`translated_cds`):
-
-| Annotator | kept | ignored |
-|---|---|---|
-| Bakta | `<name>.faa` | `<name>.hypotheticals.faa`, `<name>_proteins.faa` |
-| PGAP | `annot.faa` | `annot_translated_cds.faa` |
-| Prokka | `<name>.faa` | (none) |
-
-If more than one `.faa` (or `.gbff`/`.gbk`) still remains, the tool stops with an
-error naming the files rather than guessing.
+Genome stems namespace every protein ID (`<genome_stem>__<locus_tag>`), so they
+must be unique across the input and must equal your antiSMASH directory names
+for `generate-antismash-db` to line up. Duplicate stems (e.g. a flat
+`Foo.gbff` alongside a `Foo/` folder) are a hard error.
 
 ## Changes from the original EvoMining
 

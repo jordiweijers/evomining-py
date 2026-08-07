@@ -3,7 +3,10 @@
 evomining.genomedb
 ==================
 
-Build EvoMining's genome database from a folder of GenBank (.gbff/.gbk) files.
+Build EvoMining's genome database from GenBank (.gbff/.gbk) input, given either as
+a flat folder of GenBank files (stem = filename) or as a folder of per-genome
+sub-folders each holding that genome's annotation (stem = folder name, e.g. Bakta
+output). Both layouts are accepted transparently; see resolve_genome_inputs.
 
 This replaces the former RAST-table builder. There is no more 13-column .txt, no
 Corason_Rast.IDs, and no 666666.<id>.peg.<N> scheme. Genomes are parsed straight
@@ -39,7 +42,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from .io.loader import discover, load_genomes
+from .io.loader import load_genomes, resolve_genome_inputs
 
 
 ID_SEP = "__"
@@ -57,29 +60,32 @@ def run(args):
     outdir = Path(args.output_dir)
     outdir.mkdir(parents=True, exist_ok=True)
 
-    # Resolve the genome file list. Accept a directory, or explicit --lists names
-    # restricting which stems to include.
-    all_paths = discover([input_dir]) if input_dir.is_dir() else []
-    if not all_paths:
-        raise SystemExit(f"ERROR: no GenBank files found under {input_dir}")
+    # Resolve the genome file list. Accepts either a flat directory of GenBank
+    # files (stem = filename) or a directory of per-genome sub-folders holding
+    # each genome's annotation (stem = folder name); --lists restricts stems.
+    try:
+        pairs = resolve_genome_inputs(input_dir)
+    except (FileNotFoundError, ValueError) as exc:
+        raise SystemExit(f"ERROR: {exc}")
 
     wanted = _wanted_stems(args)
     if wanted is not None:
-        paths = [p for p in all_paths if p.stem in wanted]
-        missing = wanted - {p.stem for p in paths}
+        pairs = [(p, s) for (p, s) in pairs if s in wanted]
+        missing = wanted - {s for _, s in pairs}
         for stem in sorted(missing):
             print(f"  WARNING: no GenBank file for: {stem}", file=sys.stderr)
-    else:
-        paths = all_paths
 
-    if not paths:
+    if not pairs:
         raise SystemExit("ERROR: no genomes selected")
 
+    paths = [p for p, _ in pairs]
+    stems = {p: s for p, s in pairs}
     names_file = Path(args.names) if args.names else None
 
     print(f"Loading {len(paths)} GenBank genome(s)...")
     genomes = load_genomes(paths, names_file=names_file,
-                           keep_pseudo=getattr(args, 'keep_pseudogenes', False))
+                           keep_pseudo=getattr(args, 'keep_pseudogenes', False),
+                           stems=stems)
 
     fasta_path = outdir / "GENOMES.fasta"
     func_path = outdir / "genome_functions.tsv"
