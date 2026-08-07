@@ -25,6 +25,7 @@ micromamba activate evomining
 evomining check           # verify every external tool resolves
 ```
 
+  ##THIS IS NOT TESTED##
 If you already have the external tools on your `$PATH` and only want the Python
 package in an existing environment:
 
@@ -35,6 +36,7 @@ pip install "git+https://github.com/bscheep/evomining-py.git@main"
 Nothing is hardcoded to a conda prefix — tools are taken from `$PATH`. To force
 one tool to come from a different environment (e.g. an older BLAST to reproduce
 a previous run):
+  ##AGAIN, NO GUARANTEES##
 
 ```bash
 evomining check --tool-env blastp=/vol/local/conda_envs/blast+
@@ -52,7 +54,7 @@ evomining generate-genome-db -i <genomes_dir> --list-dir <lists_dir>
 evomining generate-enzyme-db --fasta-dir <enzyme_families_dir>
 evomining generate-antismash-db --antismash-dir <antismash_dir>   # optional
 evomining start
-evomining analyze --mibig MiBIG_DB.faa
+evomining analyze --mibig MiBIG_DB.faa --antismash #optional
 evomining trees   --mibig MiBIG_DB.faa
 ```
 
@@ -273,10 +275,6 @@ The original EvoMining (EvoMining 2.0, Selem-Mojica et al. 2019) is a Perl
 pipeline distributed as a Docker image, driven through a web interface and a
 single `perl startEvoMining.pl` invocation:
 
-```
-perl startEvoMining.pl -g <genome-DB> -r <myRastIds> -c <central-DB> \
-                       -n <natural-DB> -a <antismash_db>
-```
 
 It required genomes to be annotated through the RAST platform (the `-r
 <myRastIds>` argument), bundled its BLAST, MUSCLE, Gblocks, FastTree and Newick
@@ -309,9 +307,27 @@ trees — but changes how it is run and what it consumes:
    TSV, or expressed transcripts (`--transcripts`), each transcript becoming its
    own `custom|N` family.
 
-Note on alignment: the original wrapped MUSCLE with Gblocks for alignment
-cleanup; this version uses MUSCLE (falling back to MAFFT) with trimAl.
+Notes:
+1. This version uses the same logic, but newer tools might result in different outcomes
+2. It was tested with the original example data (to be added) and gives similar result
+   but slightly different tree topology and classifications.
+3. Notably there are less cyan (antismash) nodes in the example data with this version
+   which might be because of false-positive antismash results with older version of that.
+4. This tool was developed specifically for my own use with a non-traditional application
+   using a single transcript as the seed for an enzyme family. The tool was later adapted
+   to represent the original evomining, but support the transcript workflow too.
 
-`classify_gator_windows.py`, `evominingtoGatorGC_perEFDB.py` and the heatmap
-scripts are deliberately outside this package — they run after GATOR-GC and
-belong with it.
+## To do
+- more tests
+- Link to corason-py
+- Link to GATOR-GC
+  this was partly started already:
+
+  `evominingtoGatorGC_perEFDB.py` is a script that is not included now, but automatically
+  runs gator-gc on a single query from a diverging evomining prediction clade. it uses
+  nw-utilities to find green leaves, then moves one branch down until it finds a non-
+  green hit. This way it finds "green clades" which are clades of diverging enzymes
+  and selects a query based on the best bitscore in the BBH blast. Then it creates
+  a pre-gatordb for all genomes in that clade and runs gator-gc with the query.
+  it works, but creates a lot of duplicate output especially if there are multiple
+  expansions within an EF.
