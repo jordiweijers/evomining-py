@@ -309,6 +309,10 @@ trees — but changes how it is run and what it consumes:
 
 Notes:
 1. This version uses the same logic, but newer tools might result in different outcomes
+   For calculation of the expanded enzymes, the paper stated mean + 2SD but the old tool
+   used mean + 1SD in the code, while the example was I think generated with median + 1
+   In the end I setteld for mean + 1 SD like the original code, but made this customizable
+   to 2 SD or more. Median + 1 is not supported now
 2. It was tested with the original example data (to be added) and gives similar result
    but slightly different tree topology and classifications.
 3. Notably there are less cyan (antismash) nodes in the example data with this version
