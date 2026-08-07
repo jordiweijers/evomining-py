@@ -1,11 +1,11 @@
 # EvoMining
 
 Enzyme family expansion analysis for biosynthetic gene cluster discovery — a
-Python reimplementation of EvoMining (Selem-Mojica et al. 2019), packaged as a
+Python reimplementation of [EvoMining](https://github.com/nselem/evomining) (Selem-Mojica et al. 2019), packaged as a
 single conda environment and a single `evomining` command.
 
 Genomes are read directly from GenBank (`.gbff`/`.gbk`); the parser is
-vendored/adapted from corason-py, and every artifact is keyed on a composite
+vendored/adapted from [corason-py](https://github.com/miguel-mx/corason-py), and every artifact is keyed on a composite
 `<genome_stem>__<locus_tag>` ID. GATOR-GC, CORASON and antiSMASH stay in their
 own environments — they are separate steps in the workflow rather than part of
 EvoMining proper.
