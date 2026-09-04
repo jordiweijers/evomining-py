@@ -11,9 +11,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from .genbank import GENBANK_SUFFIXES, is_genbank, load_genbank
-from .models import Genome
-from .names import load_names
+from .genbank import GENBANK_SUFFIXES, is_genbank
+from .models import GenomeMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -128,75 +127,46 @@ def resolve_genome_inputs(root: Path) -> list[tuple[Path, str]]:
     return pairs
 
 
-def load_genomes(paths: list[Path], names_file: Path | None = None,
-                 keep_pseudo: bool = False,
-                 stems: dict[Path, str] | None = None) -> list[Genome]:
-    """Load every GenBank genome in ``paths``, applying an optional name override.
-
-    ``stems`` optionally maps a file path to the genome stem it should use (from
-    :func:`resolve_genome_inputs`, e.g. the folder name in the per-genome-folder
-    layout). When absent, the filename stem is used, preserving flat-layout
-    behaviour. The ``--names`` override is keyed on the resolved stem.
-    """
-    names = load_names(names_file) if names_file else {}
-    genomes: list[Genome] = []
-
-    for path in discover(paths):
-        stem = stems.get(path) if stems else None
-        override = names.get(stem or path.stem)
-        if not is_genbank(path):
-            raise ValueError(
-                f"{path}: unrecognized genome format. Expected a GenBank file "
-                f"({', '.join(sorted(GENBANK_SUFFIXES))})."
-            )
-        genomes.append(load_genbank(path, name=override, keep_pseudo=keep_pseudo,
-                                    stem=stem))
-
-    _disambiguate(genomes)
-    return genomes
-
-
-def _disambiguate(genomes: list[Genome]) -> None:
+def disambiguate_names(metas: list[GenomeMetadata]) -> None:
     """Make organism display names unique.
 
-    Names become tree leaf labels, where duplicates make the tree ambiguous. The
+    Names become tree leaf lables, where duplicates make the tree ambiguous. The
     accession is preferred for disambiguation, the filename stem as fallback.
 
-    NOTE: this touches only ``Genome.name`` (the display name). EvoMining's protein
-    IDs are namespaced by ``Genome.id`` (the filename stem), which is unique per
+    NOTE: this touches only GenomeMetadata.name (the display name). EvoMining's protein
+    IDs are namespaced by GenomeMetadata.id (the filename stem), which is unique per
     file regardless of this step, so IDs stay stable across batches.
     """
-    groups: dict[str, list[Genome]] = {}
-    for genome in genomes:
-        groups.setdefault(genome.name, []).append(genome)
+    groups: dict[str, list] = {}
+    for meta in metas:
+        groups.setdefault(meta.name, []).append(meta)
 
     for name, group in groups.items():
         if len(group) == 1:
             continue
 
-        accessions = [g.accessions[0] if g.accessions else None for g in group]
+        accessions = [m.accessions[0] if m.accessions else None for m in group]
         distinct = all(accessions) and len(set(accessions)) == len(accessions)
         logger.warning(
             "%d genomes share the organism name %r; disambiguating with %s",
             len(group), name, "accession" if distinct else "filename",
         )
-        for genome in group:
-            suffix = genome.accessions[0] if distinct else genome.id
-            genome.name = f"{name} {suffix}"
+        for meta in group:
+            suffix = meta.accessions[0] if distinct else meta.id
+            meta.name = f"{name} {suffix}"
+    _enforce_unique_names(metas)
 
-    _enforce_unique_names(genomes)
 
-
-def _enforce_unique_names(genomes: list[Genome]) -> None:
+def _enforce_unique_names(metas: list[GenomeMetadata]) -> None:
     """Last resort if two genomes still collide after accession/filename suffixing."""
     taken: set[str] = set()
-    for genome in genomes:
-        if genome.name not in taken:
-            taken.add(genome.name)
+    for meta in metas:
+        if meta.name not in taken:
+            taken.add(meta.name)
             continue
         ordinal = 2
-        while f"{genome.name} {ordinal}" in taken:
+        while f"{meta.name} {ordinal}" in taken:
             ordinal += 1
-        logger.warning("organism name %r is still duplicated; suffixing", genome.name)
-        genome.name = f"{genome.name} {ordinal}"
-        taken.add(genome.name)
+        logger.warning("organism name %r is still duplicated; suffixing", meta.name)
+        meta.name = f"{meta.name} {ordinal}"
+        taken.add(meta.name)

@@ -42,7 +42,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from .io.loader import load_genomes, resolve_genome_inputs
+from .utils import setup_logging
+from .io.genbank import load_genbank
+from .io.loader import disambiguate_names, resolve_genome_inputs
+from .io.names import load_names
+
 
 
 ID_SEP = "__"
@@ -51,14 +55,12 @@ ID_SEP = "__"
 def composite_id(genome_stem: str, gene_id: str) -> str:
     return f"{genome_stem}{ID_SEP}{gene_id}"
 
-
-
-
 def run(args):
     """Parse GenBank genomes and write EvoMining's flat genome artifacts."""
     input_dir = Path(args.input_dir)
     outdir = Path(args.output_dir)
     outdir.mkdir(parents=True, exist_ok=True)
+    logger = setup_logging(outdir / "evomining.log", name="evomining")
 
     # Resolve the genome file list. Accepts either a flat directory of GenBank
     # files (stem = filename) or a directory of per-genome sub-folders holding
@@ -78,43 +80,51 @@ def run(args):
     if not pairs:
         raise SystemExit("ERROR: no genomes selected")
 
-    paths = [p for p, _ in pairs]
-    stems = {p: s for p, s in pairs}
-    names_file = Path(args.names) if args.names else None
-
-    print(f"Loading {len(paths)} GenBank genome(s)...")
-    genomes = load_genomes(paths, names_file=names_file,
-                           keep_pseudo=getattr(args, 'keep_pseudogenes', False),
-                           stems=stems)
+    keep_pseudo = getattr(args, 'keep_pseudogenes', False)
+    name_overrides = load_names(Path(args.names)) if args.names else {}
 
     fasta_path = outdir / "GENOMES.fasta"
     func_path = outdir / "genome_functions.tsv"
     names_path = outdir / "genome_names.tsv"
 
+    logger.info(f"Loading {len(pairs)} GenBank genome(s)...")
+    
+    metas = []
     total_genes = 0
     with open(fasta_path, "w") as fa, \
          open(func_path, "w") as fn, \
          open(names_path, "w") as nm:
         fn.write("protein_id\tfunction\n")
         nm.write("protein_id\tgenome_name\n")
-        for g in genomes:
+        for path, stem in pairs:
+            genome = load_genbank(path, name=name_overrides.get(stem), keep_pseudo=keep_pseudo, stem=stem)
+            
             gene_count = 0
-            for gene in g.genes():
-                cid = composite_id(g.id, gene.id)
+            for gene in genome.genes():
+                cid = composite_id(genome.metadata.id, gene.id)
                 fa.write(f">{cid}\n")
                 for i in range(0, len(gene.translation), 60):
                     fa.write(gene.translation[i:i + 60] + "\n")
                 fn.write(f"{cid}\t{gene.product}\n")
-                nm.write(f"{cid}\t{g.name}\n")
+                nm.write(f"{cid}\t{genome.metadata.name}\n")
                 gene_count += 1
             total_genes += gene_count
-            print(f"  [{g.id}]  {g.name:40s}  {gene_count:>5} proteins  "
-                  f"({len(g.contigs)} contigs)")
+            logger.info(f"  [{genome.metadata.id}]  {genome.metadata.name:40s}  {gene_count:>5} proteins  "
+                        f"({len(genome.contigs)} contigs)")
+            metas.append(genome.metadata)
 
-    print(f"""
+    before = {m.id: m.name for m in metas}
+    disambiguate_names(metas)
+    renamed = {m.id: m.name for m in metas if m.name != before[m.id]}
+    if renamed:
+        logger.info(f"Fixing up {len(renamed)} duplicate organism name(s) in {names_path.name}...")
+        _patch_genome_names(names_path, renamed)
+
+
+    logger.info(f"""
 {'=' * 60}
   Done!
-  Genomes:           {len(genomes)}
+  Genomes:           {len(metas)}
   Total proteins:    {total_genes}
 
   Protein FASTA:     {fasta_path}
@@ -123,6 +133,21 @@ def run(args):
 {'=' * 60}
 """)
     return outdir
+
+
+
+def _patch_genome_names(names_path: Path, renamed: dict[str, str]):
+    """Rewrite the genome_names.tsv for genomes that have been renamed."""
+    tmp_path = names_path.with_suffix(names_path.suffix + ".tmp")
+    with open(names_path) as src, open(tmp_path, "w") as dst:
+        for line in src:
+            cid = line.split("\t", 1)[0]
+            stem = cid.split(ID_SEP, 1)[0]
+            if stem in renamed:
+                dst.write(f"{cid}\t{renamed[stem]}\n")
+            else:
+                dst.write(line)
+    tmp_path.replace(names_path)
 
 
 def _wanted_stems(args):

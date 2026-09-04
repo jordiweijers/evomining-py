@@ -47,7 +47,8 @@ def load_genbank(path: Path, name: str | None = None, keep_pseudo: bool = False,
     name rather than a possibly-generic inner filename.
     """
     gid = stem or path.stem
-    genome = Genome(id=gid, name=name or "", source_path=path)
+    genome_name = name
+    accessions: list[str] = []
 
     by_contig: dict[str, list[Gene]] = {}
     contig_lengths: dict[str, int | None] = {}
@@ -58,10 +59,10 @@ def load_genbank(path: Path, name: str | None = None, keep_pseudo: bool = False,
         if not contig_id or contig_id == "<unknown id>":
             contig_id = f"{gid}_{len(by_contig) + 1}"
 
-        if record.id and record.id not in genome.accessions:
-            genome.accessions.append(record.id)
-        if not genome.name:
-            genome.name = record.annotations.get("organism", "") or ""
+        if record.id and record.id not in accessions:
+            accessions.append(record.id)
+        if not genome_name:
+            genome_name = record.annotations.get("organism", "") or ""
 
         contig_lengths[contig_id] = len(record.seq) if _has_sequence(record.seq) else None
         genes: list[Gene] = []
@@ -77,10 +78,12 @@ def load_genbank(path: Path, name: str | None = None, keep_pseudo: bool = False,
         if genes:
             by_contig[contig_id] = genes
 
-    if not genome.name:
-        genome.name = path.stem
+    genome_name = genome_name or path.stem
 
     counts.report(path)
+
+    genome = Genome(id=gid, name=genome_name, accessions=accessions, source_path=path)
+    
     finalize_contigs(genome, by_contig)
 
     for contig_id, length in contig_lengths.items():

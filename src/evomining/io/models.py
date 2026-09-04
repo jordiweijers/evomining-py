@@ -66,9 +66,14 @@ class Contig:
 
 
 @dataclass(slots=True)
-class Genome:
-    """One annotated genome: its contigs, and the names it answers to."""
-
+class GenomeMetadata:
+    """Metadata for a genome, separate from its contigs and genes.
+    
+    Split out from Genome so a clear separation exists between the genome's
+    structural data (contigs and genes) and its descriptive metadata.
+    This is usefull for the downstream loading and processing of genome metadata 
+    independently of the structural genome data.
+    """
     id: str
     """Filename stem. Used for output paths, as EvoMining's ID namespace, and as
     the fallback display name."""
@@ -76,9 +81,33 @@ class Genome:
     name: str
     """Organism name, from the GenBank SOURCE record or the --names table."""
 
-    contigs: dict[str, Contig] = field(default_factory=dict)
     accessions: list[str] = field(default_factory=list)
+    """List of accession numbers associated with this genome."""
+
     source_path: Path | None = None
+    """Path to the source GenBank file, if available."""
+
+
+@dataclass(slots=True)
+class Genome:
+    """One annotated genome: its contigs, and the names it answers to (metadata)."""
+    metadata: GenomeMetadata
+    contigs: dict[str, Contig] = field(default_factory=dict)
+
+    def __init__(
+            self, id: str, 
+            name: str, 
+            contigs: dict[str, Contig] | None = None,
+            accessions: list[str] | None = None,
+            source_path: Path | None = None,
+            ) -> None:
+        self.metadata = GenomeMetadata(
+            id=id,
+            name=name,
+            accessions=accessions if accessions is not None else [],
+            source_path=source_path,
+        )
+        self.contigs = contigs if contigs is not None else {}
 
     def genes(self) -> Iterator[Gene]:
         for contig in self.contigs.values():
