@@ -8,7 +8,7 @@ paths at fixed, predictable locations beneath it.
     <cwd>/
       evomining_db/
         GENOMES.fasta              genome protein DB (composite <stem>__<locus_tag> IDs)
-        genome_names.tsv           protein_id -> organism display name
+        genome_names.tsv           genome_id -> organism display name
         genome_functions.tsv       protein_id -> product
         enzymes_db.faa             Central DB
       antismash_db.tsv             antiSMASH NP mapping (optional)

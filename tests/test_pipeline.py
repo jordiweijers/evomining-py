@@ -52,11 +52,17 @@ def test_committed_metadata_covers_every_blast_protein(pipeline):
             if "__" in value:
                 referenced.add(value)
 
-    for name in ("genome_names.tsv", "genome_functions.tsv"):
-        with open(METADATA_DIR / name) as fh:
-            next(fh)
-            have = {line.split("\t", 1)[0] for line in fh}
-        assert not (referenced - have), f"{name} is missing {sorted(referenced - have)[:5]}"
+    with open(METADATA_DIR / "genome_functions.tsv") as fh:
+        next(fh)
+        have = {line.split("\t", 1)[0] for line in fh}
+    assert not (referenced - have), f"genome_functions.tsv is missing {sorted(referenced - have)[:5]}"
+
+    referenced_stems = {value.split("__", 1)[0] for value in referenced}
+    with open(METADATA_DIR / "genome_names.tsv") as fh:
+        next(fh)
+        have_stems = {line.split("\t", 1)[0] for line in fh}
+    assert not (referenced_stems - have_stems), (
+        f"genome_names.tsv is missing {sorted(referenced_stems - have_stems)[:5]}")
 
 
 def test_full_run_matches_the_analyze_snapshots(request, pipeline):

@@ -15,7 +15,7 @@ downstream steps consume three flat artifacts written here:
 
     GENOMES.fasta          protein FASTA, one record per CDS, header = composite ID
     genome_functions.tsv   composite_id <TAB> product
-    genome_names.tsv       composite_id <TAB> organism_display_name
+    genome_names.tsv       genome_id <TAB> organism_display_name
 
 The composite protein ID is:
 
@@ -95,10 +95,10 @@ def run(args):
          open(func_path, "w") as fn, \
          open(names_path, "w") as nm:
         fn.write("protein_id\tfunction\n")
-        nm.write("protein_id\tgenome_name\n")
+        nm.write("genome_id\tgenome_name\n")
         for path, stem in pairs:
             genome = load_genbank(path, name=name_overrides.get(stem), keep_pseudo=keep_pseudo, stem=stem)
-            
+            nm.write(f"{genome.metadata.id}\t{genome.metadata.name}\n")
             gene_count = 0
             for gene in genome.genes():
                 cid = composite_id(genome.metadata.id, gene.id)
@@ -106,7 +106,6 @@ def run(args):
                 for i in range(0, len(gene.translation), 60):
                     fa.write(gene.translation[i:i + 60] + "\n")
                 fn.write(f"{cid}\t{gene.product}\n")
-                nm.write(f"{cid}\t{genome.metadata.name}\n")
                 gene_count += 1
             total_genes += gene_count
             logger.info(f"  [{genome.metadata.id}]  {genome.metadata.name:40s}  {gene_count:>5} proteins  "
@@ -141,10 +140,9 @@ def _patch_genome_names(names_path: Path, renamed: dict[str, str]):
     tmp_path = names_path.with_suffix(names_path.suffix + ".tmp")
     with open(names_path) as src, open(tmp_path, "w") as dst:
         for line in src:
-            cid = line.split("\t", 1)[0]
-            stem = cid.split(ID_SEP, 1)[0]
+            stem = line.split("\t", 1)[0]
             if stem in renamed:
-                dst.write(f"{cid}\t{renamed[stem]}\n")
+                dst.write(f"{stem}\t{renamed[stem]}\n")
             else:
                 dst.write(line)
     tmp_path.replace(names_path)

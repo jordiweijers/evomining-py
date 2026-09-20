@@ -43,7 +43,7 @@ def test_per_genome_protein_counts(request, genome_db):
     move.
     """
     counts = {}
-    with open(genome_db / "genome_names.tsv") as fh:
+    with open(genome_db / "genome_functions.tsv") as fh:
         next(fh)
         for line in fh:
             stem = line.split("\t", 1)[0].split("__", 1)[0]
@@ -75,14 +75,20 @@ def test_composite_ids_are_unique_and_well_formed(genome_db):
 
 
 def test_artifacts_line_up_with_each_other(genome_db):
-    """The three outputs must describe exactly the same protein set."""
+    """genome_functions.tsv must describe exactly the protein set in GENOMES.fasta,
+    and genome_names.tsv exactly the set of genome stems behind those proteins."""
     proteins = set(_proteins(genome_db))
-    for name, header in [("genome_names.tsv", "protein_id\tgenome_name"),
-                         ("genome_functions.tsv", "protein_id\tfunction")]:
-        lines = (genome_db / name).read_text().splitlines()
-        assert lines[0] == header
-        ids = {line.split("\t", 1)[0] for line in lines[1:]}
-        assert ids == proteins, f"{name} does not match GENOMES.fasta"
+    stems = {p.split("__", 1)[0] for p in proteins}
+
+    lines = (genome_db / "genome_functions.tsv").read_text().splitlines()
+    assert lines[0] == "protein_id\tfunction"
+    ids = {line.split("\t", 1)[0] for line in lines[1:]}
+    assert ids == proteins, "genome_functions.tsv does not match GENOMES.fasta"
+
+    lines = (genome_db / "genome_names.tsv").read_text().splitlines()
+    assert lines[0] == "genome_id\tgenome_name"
+    ids = {line.split("\t", 1)[0] for line in lines[1:]}
+    assert ids == stems, "genome_names.tsv does not match the genome stems in GENOMES.fasta"
 
 
 def test_fasta_is_wrapped_at_60_columns(genome_db):

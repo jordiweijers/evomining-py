@@ -104,6 +104,9 @@ def build_parser():
     p.add_argument("--genome-names", default=None,
                    help="genome_names.tsv from generate-genome-db "
                         "(default: ./evomining_db/genome_names.tsv)")
+    p.add_argument("--genome-functions", default=None,
+                   help="genome_functions.tsv from generate-genome-db "
+                        "(default: alongside --genome-names)")
     p.add_argument("-o", "--output", default=None,
                    help="output mapping file (default: ./evomining_db/antismash_db.tsv)")
 
@@ -247,6 +250,12 @@ def cmd_antismash_db(args):
     from . import antismashdb
     args.genome_names = _file(args.genome_names, "GENOME_NAMES",
                               "--genome-names", "generate-genome-db", "genome_names.tsv")
+    # genome_functions.tsv sits beside genome_names.tsv in the DB dir; derive it from
+    # the (possibly overridden) names path rather than assume a workspace key exists.
+    gf = args.genome_functions or (Path(args.genome_names).parent / "genome_functions.tsv")
+    args.genome_functions = str(workspace.require_file(
+        Path(gf), flag="--genome-functions", produced_by="generate-genome-db",
+        what="genome_functions.tsv"))
     args.output = args.output or str(workspace.default("ANTISMASH_DB"))
     antismashdb.run(args)
     return 0

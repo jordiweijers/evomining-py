@@ -51,13 +51,10 @@ ID_SEP = "__"
 # ---------------------------------------------------------------------------
 
 def load_genome_names(names_path):
-    """Read genome_names.tsv (protein_id<TAB>genome_name) and collapse it to
-    {genome_stem: genome_name}.
+    """Read genome_names.tsv (genome_id<TAB>genome_name) -> {genome_stem: genome_name}.
 
-    The file lists one row per protein; every protein of a genome carries the
-    same organism name, so keying on the stem (the part before the first `__`)
-    is exact. This is the composite-ID replacement for `parse_rast_ids`' first
-    return value; the whole `org_lookup` mechanism is no longer needed.
+    One row per genome. This is the composite-ID replacement for `parse_rast_ids`'s
+    first return value; the whole `org_lookup` mechanism is no longer needed.
     """
     names = {}
     with open(names_path) as fh:
@@ -65,10 +62,9 @@ def load_genome_names(names_path):
             parts = line.rstrip("\n").split("\t", 1)
             if len(parts) < 2:
                 continue
-            composite = parts[0].strip()
-            if not composite or composite == "protein_id":  # header row
+            stem = parts[0].strip()
+            if not stem or stem == "genome_id":  # header row
                 continue
-            stem = composite.split(ID_SEP, 1)[0]
             names[stem] = parts[1].strip()
     return names
 

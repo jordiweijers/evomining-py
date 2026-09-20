@@ -65,8 +65,9 @@ each step.
 
 Reads a folder of GenBank genomes and writes the composite-ID protein database
 the rest of the pipeline consumes: `GENOMES.fasta` (one record per CDS, header =
-`<genome_stem>__<locus_tag>`), `genome_names.tsv` (id → organism name) and
-`genome_functions.tsv` (id → product).
+`<genome_stem>__<locus_tag>`), `genome_names.tsv` (genome id → organism name, one
+row per genome) and `genome_functions.tsv` (protein id → product, one row per
+protein).
 
 ```bash
 evomining generate-genome-db -i <genomes_dir> --list-dir <lists_dir>
@@ -156,6 +157,9 @@ evomining generate-antismash-db --antismash-dir <antismash_dir>
   optionally grouped under clade subdirectories).
 - **`--genome-names`** — `genome_names.tsv` from step 1, used to recognise valid
   genome stems. Default `./evomining_db/genome_names.tsv`.
+- **`--genome-functions`** — `genome_functions.tsv` from step 1, used to
+  recognise real protein IDs (a region GBK also lists pseudogenes/RNA genes
+  that never made it into the protein DB). Default: alongside `--genome-names`.
 - **`-o, --output`** — default `./evomining_db/antismash_db.tsv`.
 
 ### 4. `start` — forward + reverse BLAST
