@@ -15,10 +15,12 @@ Prokka run, and a fungal annotation:
 * **Translations** come from ``/translation`` when present, else are derived from
   the contig sequence honoring ``/transl_table`` and ``/codon_start``.
 * **Pseudogenes** are skipped rather than translated into nonsense.
+* **Compressed input** (``.gbff.gz``, ``.gbk.gz``, ...) is read transparently.
 """
 
 from __future__ import annotations
 
+import gzip
 import logging
 from pathlib import Path
 
@@ -34,8 +36,36 @@ GENBANK_SUFFIXES = frozenset({".gbk", ".gb", ".gbff", ".genbank"})
 _DEFAULT_TRANSL_TABLE = 11  # bacterial / archaeal / plant plastid
 
 
+def _plain(path: Path) -> Path:
+    """``path`` with a trailing ``.gz`` removed: ``Foo.gbff.gz`` -> ``Foo.gbff``."""
+    return path.with_suffix("") if path.suffix.lower() == ".gz" else path
+
+
 def is_genbank(path: Path) -> bool:
-    return path.suffix.lower() in GENBANK_SUFFIXES
+    return _plain(path).suffix.lower() in GENBANK_SUFFIXES
+
+
+def genbank_suffix(path: Path) -> str:
+    """The GenBank suffix, ignoring a trailing ``.gz`` (``.gbff`` for ``x.gbff.gz``)."""
+    return _plain(path).suffix.lower()
+
+
+def genome_stem(path: Path) -> str:
+    """The genome stem of a (possibly gzipped) GenBank file.
+
+    ``Path.stem`` alone is wrong for compressed input -- ``Foo.gbff.gz`` would give
+    ``Foo.gbff``. The stem namespaces every protein ID and has to match ``--lists``
+    entries and antiSMASH directory names, so getting it wrong breaks those joins
+    silently rather than loudly. Always go through this helper.
+    """
+    return _plain(path).stem
+
+
+def _parse_records(path: Path):
+    """Yield the GenBank records of ``path``, decompressing ``.gz`` transparently."""
+    opener = gzip.open if path.suffix.lower() == ".gz" else open
+    with opener(path, "rt") as handle:
+        yield from SeqIO.parse(handle, "genbank")
 
 
 def load_genbank(path: Path, name: str | None = None, keep_pseudo: bool = False,
@@ -46,22 +76,23 @@ def load_genbank(path: Path, name: str | None = None, keep_pseudo: bool = False,
     set when genomes are laid out one-per-folder, so the id becomes the folder
     name rather than a possibly-generic inner filename.
     """
-    gid = stem or path.stem
-    genome = Genome(id=gid, name=name or "", source_path=path)
+    gid = stem or genome_stem(path)
+    genome_name = name
+    accessions: list[str] = []
 
     by_contig: dict[str, list[Gene]] = {}
     contig_lengths: dict[str, int | None] = {}
     counts = _SkipCounts(keep_pseudo)
 
-    for record in SeqIO.parse(path, "genbank"):
+    for record in _parse_records(path):
         contig_id = record.id or record.name
         if not contig_id or contig_id == "<unknown id>":
             contig_id = f"{gid}_{len(by_contig) + 1}"
 
-        if record.id and record.id not in genome.accessions:
-            genome.accessions.append(record.id)
-        if not genome.name:
-            genome.name = record.annotations.get("organism", "") or ""
+        if record.id and record.id not in accessions:
+            accessions.append(record.id)
+        if not genome_name:
+            genome_name = record.annotations.get("organism", "") or ""
 
         contig_lengths[contig_id] = len(record.seq) if _has_sequence(record.seq) else None
         genes: list[Gene] = []
@@ -77,10 +108,12 @@ def load_genbank(path: Path, name: str | None = None, keep_pseudo: bool = False,
         if genes:
             by_contig[contig_id] = genes
 
-    if not genome.name:
-        genome.name = path.stem
+    genome_name = genome_name or genome_stem(path)
 
     counts.report(path)
+
+    genome = Genome(id=gid, name=genome_name, accessions=accessions, source_path=path)
+    
     finalize_contigs(genome, by_contig)
 
     for contig_id, length in contig_lengths.items():

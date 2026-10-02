@@ -15,9 +15,11 @@ RAST ids. (The old builder existed almost entirely to translate locus_tag into a
 positional peg number, which composite IDs make unnecessary.)
 
 To guarantee the emitted IDs match what `generate-genome-db` produced, the set of
-valid genome stems is read from genome_names.tsv. An antiSMASH directory whose
-name is not among those stems is warned about and skipped, rather than silently
-emitting IDs that match nothing in the copy-count matrix.
+valid genome stems is read from genome_names.tsv, and the set of real protein IDs
+from genome_functions.tsv (which sits beside it and has one row per protein). An
+antiSMASH directory whose name is not among those stems is warned about and
+skipped, rather than silently emitting IDs that match nothing in the copy-count
+matrix.
 
 Output (tab-separated):
     <genome_stem>__<locus_tag>    cf_putative    <cluster_name>
@@ -30,27 +32,32 @@ import sys
 from pathlib import Path
 
 
-def load_genome_stems(genome_names_path):
+def load_genome_stems(genome_names_path, genome_functions_path):
     """Genome stems and full protein IDs the genome step produced.
 
-    genome_names.tsv is: protein_id <TAB> genome_name, where protein_id is
-    <stem>__<locus_tag>. Returns (stems, protein_ids). Stems drive antiSMASH
-    directory matching; protein_ids filter emitted mappings so cyanoSMASH only
-    contains locus_tags that are real EvoMining proteins (a region GBK also
-    lists pseudogenes / RNA genes that were dropped from the protein DB).
+    genome_names.tsv is: genome_id <TAB> genome_name, one row per genome -- its
+    id column drives antiSMASH directory matching. genome_functions.tsv is:
+    protein_id <TAB> function, one row per protein (protein_id is
+    <stem>__<locus_tag>); its id column filters emitted mappings so cyanoSMASH
+    only contains locus_tags that are real EvoMining proteins (a region GBK
+    also lists pseudogenes / RNA genes that were dropped from the protein DB).
     """
     stems = set()
-    proteins = set()
     with open(genome_names_path) as fh:
-        header = fh.readline()  # protein_id\tgenome_name
+        fh.readline()  # genome_id\tgenome_name
         for line in fh:
-            pid = line.split("\t", 1)[0].strip()
-            if not pid:
-                continue
-            proteins.add(pid)
-            stem = pid.split("__", 1)[0]
+            stem = line.split("\t", 1)[0].strip()
             if stem:
                 stems.add(stem)
+
+    proteins = set()
+    with open(genome_functions_path) as fh:
+        fh.readline()  # protein_id\tfunction
+        for line in fh:
+            pid = line.split("\t", 1)[0].strip()
+            if pid:
+                proteins.add(pid)
+
     return stems, proteins
 
 
@@ -97,9 +104,9 @@ def extract_region_name(gbk_filename):
 
 def run(args):
     """Build the antiSMASH NP mapping keyed on composite IDs."""
-    stems, proteins = load_genome_stems(args.genome_names)
-    print(f"Loaded {len(stems)} genome stems / {len(proteins)} proteins "
-          f"from {Path(args.genome_names).name}\n")
+    stems, proteins = load_genome_stems(args.genome_names, args.genome_functions)
+    print(f"Loaded {len(stems)} genome stems from {Path(args.genome_names).name} / "
+          f"{len(proteins)} proteins from {Path(args.genome_functions).name}\n")
 
     total_mappings = 0
     total_regions = 0

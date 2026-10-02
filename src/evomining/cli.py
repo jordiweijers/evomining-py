@@ -48,7 +48,7 @@ def build_parser():
     p = sub.add_parser("generate-genome-db", aliases=["genome-db"],
                        help="GenBank (.gbff) genomes -> EvoMining protein DB (no RAST)")
     p.add_argument("-i", "--input-dir", required=True,
-                   help="directory of GenBank (.gbff/.gbk) files, one per genome")
+                   help="directory of GenBank (.gbff/.gbk, optionally .gz) files, one per genome")
     p.add_argument("-l", "--lists", nargs="+", default=None,
                    help="restrict to these genome stems; .txt files, one stem per line")
     p.add_argument("--list-dir", default=None,
@@ -60,6 +60,8 @@ def build_parser():
     p.add_argument("--keep-pseudogenes", action="store_true",
                    help="keep pseudogene CDS (default: drop them; they are not functional "
                         "enzymes and can inflate copy counts). Use for continuity with older runs.")
+    p.add_argument("-j", "--jobs", type=int, default=8,
+                   help="number of parallel jobs to use (default: 8)")
 
     # -- generate-enzyme-db --
     p = sub.add_parser("generate-enzyme-db", aliases=["enzyme-db"],
@@ -104,6 +106,9 @@ def build_parser():
     p.add_argument("--genome-names", default=None,
                    help="genome_names.tsv from generate-genome-db "
                         "(default: ./evomining_db/genome_names.tsv)")
+    p.add_argument("--genome-functions", default=None,
+                   help="genome_functions.tsv from generate-genome-db "
+                        "(default: alongside --genome-names)")
     p.add_argument("-o", "--output", default=None,
                    help="output mapping file (default: ./evomining_db/antismash_db.tsv)")
 
@@ -247,6 +252,12 @@ def cmd_antismash_db(args):
     from . import antismashdb
     args.genome_names = _file(args.genome_names, "GENOME_NAMES",
                               "--genome-names", "generate-genome-db", "genome_names.tsv")
+    # genome_functions.tsv sits beside genome_names.tsv in the DB dir; derive it from
+    # the (possibly overridden) names path rather than assume a workspace key exists.
+    gf = args.genome_functions or (Path(args.genome_names).parent / "genome_functions.tsv")
+    args.genome_functions = str(workspace.require_file(
+        Path(gf), flag="--genome-functions", produced_by="generate-genome-db",
+        what="genome_functions.tsv"))
     args.output = args.output or str(workspace.default("ANTISMASH_DB"))
     antismashdb.run(args)
     return 0
